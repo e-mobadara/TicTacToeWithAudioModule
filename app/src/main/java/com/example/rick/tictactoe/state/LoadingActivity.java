@@ -6,8 +6,6 @@ import android.os.Bundle;
 import android.view.View;
 
 import com.e_mobadara.audiomanaging.AudioSettingsActivity;
-import com.e_mobadara.audiomanaging.MainActivity;
-import com.example.ensias_auth_library.FoxyAuth;
 import com.example.rick.tictactoe.R;
 
 public class LoadingActivity extends AppCompatActivity {
