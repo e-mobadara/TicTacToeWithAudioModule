@@ -2,7 +2,7 @@ package com.example.rick.tictactoe.state;
 
 import android.media.MediaPlayer;
 
-import com.example.rick.tictactoe.audiomanaging.moblibAudioFileManager;
+import com.e_mobadara.audiomanaging.moblibAudioFileManager;
 import com.example.emobadaragaminglib.Base.Graphics;
 import com.example.emobadaragaminglib.Base.Screen;
 import com.example.emobadaragaminglib.Implementation.AndroidGame;
@@ -19,6 +19,8 @@ public class GameActivity extends AndroidGame {
 
     @Override
     public Screen getInitScreen() {
+        
+
         initAssets();
         return new GameScreen(this);
     }
@@ -28,7 +30,7 @@ public class GameActivity extends AndroidGame {
         MyX_O.__x = getGraphics().newImage(R.drawable.x,Graphics.ImageFormat.ARGB8888,getResources());
         SquareAssets.square = getGraphics().newImage(R.drawable.square,Graphics.ImageFormat.ARGB8888,getResources());
         Again.image  = getGraphics().newImage(R.drawable.again,Graphics.ImageFormat.ARGB8888,getResources());
-        Losingsound = moblibAudioFileManager.getRandomAudioFile(this,"encouragement","FR");
-        Winningsound = moblibAudioFileManager.getRandomAudioFile(this,"good","FR");
+        Losingsound = moblibAudioFileManager.getRandomAudioFile(this,"encouragement","AR");
+        Winningsound = moblibAudioFileManager.getRandomAudioFile(this,"good","AR");
     }
 }

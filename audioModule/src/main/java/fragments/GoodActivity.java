@@ -1,10 +1,12 @@
 package fragments;
 
 import android.app.Dialog;
+import android.arch.persistence.room.Room;
 import android.content.ContentResolver;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -19,16 +21,18 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 
-import com.example.rick.tictactoe.Adapter.myAdapter;
-import com.example.rick.tictactoe.Data.AudioFile;
-import com.example.rick.tictactoe.Data.AudioFilesTable;
-import com.example.rick.tictactoe.audiomanaging.MainActivity;
-import com.example.rick.tictactoe.audiomanaging.R;
-import com.example.rick.tictactoe.audiomanaging.addAudioFile;
-import com.example.rick.tictactoe.utils.RecyclerItemClickListener;
+import com.e_mobadara.Adapter.myAdapter;
+import com.e_mobadara.Database.AudioFile;
+import com.e_mobadara.Database.MyDatabase;
+import com.e_mobadara.audiomanaging.MainActivity;
+import com.e_mobadara.audiomanaging.R;
+import com.e_mobadara.audiomanaging.addAudioFile;
+import com.e_mobadara.utils.RecyclerItemClickListener;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,6 +48,9 @@ public class GoodActivity extends Fragment {
     private int _position;
 
     private static final int CURSOR_LOADER_ID = 0;
+    private MyDatabase dbInstance;
+
+    private MediaPlayer mp = new MediaPlayer();
 
     @Nullable
     @Override
@@ -52,6 +59,11 @@ public class GoodActivity extends Fragment {
         View view = inflater.inflate(R.layout.activity_good, container, false);
 
         Log.d(TAG, " inside_oncreateView");
+
+        dbInstance = Room.databaseBuilder(view.getContext(),
+                MyDatabase.class, "AudioFiles")
+                .allowMainThreadQueries()
+                .build();
 
         fab = view.findViewById(R.id.good_fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -70,7 +82,6 @@ public class GoodActivity extends Fragment {
             }
         });
 
-
         // 1. get a reference to recyclerView
         recyclerView =  view.findViewById(R.id.good_my_recycler_view);
         // this is data fr  o recycler view
@@ -78,11 +89,11 @@ public class GoodActivity extends Fragment {
          * you need to add audio files here.
          */
 
-
         itemsData = loadDataFromDatabase();
+        Log.d(TAG, itemsData.toString());
 
         /**
-         * you can always add some defaults audio files here
+         * you can always add some default audio files here
          */
         // 2. set layoutManger
         recyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
@@ -102,10 +113,25 @@ public class GoodActivity extends Fragment {
         // specify an adapter (see also next example)
         mAdapter = new myAdapter(itemsData);
         mRecyclerView.setAdapter(mAdapter);
-        recyclerView.addOnItemTouchListener(
+        recyclerView
+                .addOnItemTouchListener(
                 new RecyclerItemClickListener(getContext(), recyclerView ,new RecyclerItemClickListener.OnItemClickListener() {
                     @Override public void onItemClick(View view, final int position) {
                         Log.d(TAG, "RecyclerItemClickListener");
+                        _position = position;
+                        if (mp.isPlaying()) {
+                            Log.d(TAG, "isplaying");
+                            if (mp != null) {
+                                Log.d(TAG, "stoping");
+                                mp.stop();
+                                mp.reset();
+                                //mPlayPause.setImageResource(R.drawable.ic_play);
+                            }
+                        } else {
+                            Log.d(TAG, "starting");
+                            playSong(itemsData.get(_position).getafPath());
+                            //mPlayPause.setImageResource(R.drawable.ic_stop);
+                        }
                     }
 
                     @Override
@@ -113,7 +139,9 @@ public class GoodActivity extends Fragment {
                         Log.d(TAG, " onLongItemClick");
                         _position = position;
                         /**
-                         * ici on va impléménter le code de suppression d'un fichier audio séléctionné
+                         * ici on va impléménter le code de suppression d'un fichier audio séléctionné, on va
+                         * supprimer de la base de données, mais dans le dossier e-mobadara il faut tester tout d'abord
+                         * si ce fichier audio est indexé.
                          */
                         AlertDialog ad = new AlertDialog.Builder(getContext())
                                 .create();
@@ -125,57 +153,90 @@ public class GoodActivity extends Fragment {
                             public void onClick(DialogInterface dialog, int which) {
                                 AudioFile i  = itemsData.get(_position);
                                 Log.d(TAG, " deleting audio file.");
-                                File fileToDelete = new File (itemsData.get(_position).getafPath());
-                                Log.d(TAG, itemsData.get(_position).getafPath());
-                                boolean success = fileToDelete.delete();
-                                Log.d(TAG, success +" deleting file");
-                                ContentResolver cr = getActivity().getContentResolver();
-                                String[] crParam = {i.getAfId()};
-                                cr.delete(AudioFilesTable.AudioFilesEntry.CONTENT_URI,"id = ?",crParam );
+                                if(!checkIfAudioFileIsUsed(i)) {
+                                    File fileToDelete = new File (i.getafPath());
+                                    Log.d(TAG, itemsData.get(_position).getafPath());
+                                    boolean success = fileToDelete.delete();
+                                    Log.d(TAG, success + " : deleted file");
+                                }
+                                /* To query all records */
+                                Log.d(TAG, " delete data from database :");
+                                dbInstance.AudioFileDao()
+                                        .deleteAudioFile(i);
+                                mp.release();
                                 reloadActivity();
-                                dialog.dismiss();
                             }
                         });
                         ad.show();
                     }
-
                 }));
-
-
         return view;
+    }
+
+    private boolean checkIfAudioFileIsUsed(AudioFile i) {
+        /* To query all records */
+        Log.d(TAG, " fetching data from database :");
+        List<AudioFile> afs = dbInstance.AudioFileDao().getAudioFiles();
+        //AudioFile e = new AudioFile(...) ;
+        //dbInstance.etabDao().addAudioFile(e);
+        for(AudioFile af : afs) {
+            return true;
+        }
+        return false;
     }
 
     void reloadActivity(){
         Intent intent = new Intent(getContext(),MainActivity.class);
         intent.putExtra("langue",MainActivity.getLangue());
         startActivity(intent);
+        mp.release();
         getActivity().finish();
     }
     List<AudioFile> loadDataFromDatabase() {
         /* To query all records */
-        String[] crParam = {current_folder, MainActivity.getLangue()};
-        Cursor cursor = getActivity().getContentResolver()
-                .query(AudioFilesTable.AudioFilesEntry.CONTENT_URI,null,"type = ? and langue = ?",crParam,null);
-        List<AudioFile> afl = new ArrayList<AudioFile>();
-        AudioFile af = new AudioFile();
         Log.d(TAG, " fetching data from database :");
-        if( cursor != null && cursor.moveToFirst()) {
-            // Loop in the cursor to get each row.
-            do {
-
-                // Get columns values.
-                Log.d(TAG, " cursor");
-                Log.d(TAG, cursor.getString(cursor.getColumnIndex("name")));
-                af.setafName(cursor.getString(cursor.getColumnIndex("name")));
-                af.setafType(cursor.getString(cursor.getColumnIndex("type")));
-                af.setafLangue(cursor.getString(cursor.getColumnIndex("langue")));
-                af.setafPath(cursor.getString(cursor.getColumnIndex("path")));
-                af.setAfId(cursor.getString(cursor.getColumnIndex("id")));
-                afl.add(af);
+        List<AudioFile> afs = dbInstance.AudioFileDao().getAudioFilesType(current_folder, MainActivity.getLangue());
+        final List<AudioFile> audioFile = new ArrayList<>();
+        //AudioFile e = new AudioFile(...) ;
+        //dbInstance.etabDao().addAudioFile(e);
+        for(AudioFile af : afs) {
+            if(checkAudioFileIfExist(af.getafPath())){
+                AudioFile itm = new AudioFile(af.getafId(), af.getafName(), af.getafType(),af.getafPath(), af.getafLangue());
+                audioFile.add(itm);
                 Log.d(TAG,af.toString());
-            } while (cursor.moveToNext());
+            }else{
+                dbInstance.AudioFileDao()
+                        .deleteAudioFile(af);
+            }
+            
         }
-        return afl;
+        return audioFile;
+    }
+
+    private void playSong(String songPath) {
+        try {
+            mp.reset();
+            mp.setDataSource(songPath);
+            mp.prepare();
+            mp.start();
+        } catch (IOException e) {
+            Log.v(getString(R.string.app_name), e.getMessage());
+        }
+    }
+
+    boolean checkAudioFileIfExist(String folder_path){
+        File folder = new File( folder_path );
+        boolean success = true;
+        if (!folder.exists()) {
+            //Toast.makeText(this, "audio-file Does Not Exist...", Toast.LENGTH_SHORT).show();
+            success = false;
+        }
+        if (success) {
+            return success;
+        } else {
+            //Toast.makeText(this, "Failed - Error", Toast.LENGTH_SHORT).show();
+            return success;
+        }
     }
 
 }
